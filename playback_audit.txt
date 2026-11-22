@@ -1,0 +1,261 @@
+0270:         if user == "hulu":
+0271:             pass
+0272:         elif user == "cracklemovies":
+0273:             pass
+0274:         elif user == "ARTEplus7":
+0275:             addLink(title, vid, 'playArte', thumb.replace("\\", ""), user, desc, duration, date, count)
+0276:             count += 1
+0277:         else:
+0278:             addLink(title, vid, 'playVideo', thumb.replace("\\", ""), user, desc, duration, date, count)
+0279:             count += 1
+0280:     if content['has_more']:
+0281:         currentPage = content['page']
+0282:         nextPage = currentPage + 1
+0283:         addDir("{0} ({1})".format(translation(30001), nextPage), url.replace("page={0}".format(currentPage), "page={0}".format(nextPage)), 'listVideos', "{0}next_page2.png".format(_ipath))
+0284:     xbmcplugin.endOfDirectory(pluginhandle)
+0285:     xbmcplugin.setContent(pluginhandle, "episodes")
+0286:     if force_mode:
+0287:         xbmc.executebuiltin('Container.SetViewMode({0})'.format(video_mode))
+0288: 
+0289: 
+0290: def listUsers(url):
+0291:     content = getUrl2(url)
+0292:     for item in content['list']:
+0293:         if item['username']:
+0294:             user = item['username'].encode('utf-8') if six.PY2 else item['username']
+0295:             thumb = item['avatar_large_url']
+0296:             videos = item['videos_total']
+0297:             views = item['views_total']
+0298:             addUserDir(user, 'owner:{0}'.format(user), 'sortVideos1', thumb.replace("\\", ""), "Views: {0}\nVideos: {1}".format(views, videos))
+0299:     if content['has_more']:
+0300:         currentPage = content['page']
+0301:         nextPage = currentPage + 1
+0302:         addDir("{0} ({1})".format(translation(30001), nextPage), url.replace("page={0}".format(currentPage), "page={0}".format(nextPage)), 'listUsers', "{0}next_page.png".format(_ipath))
+0303:     xbmcplugin.endOfDirectory(pluginhandle)
+0304:     xbmcplugin.setContent(pluginhandle, "addons")
+0305:     if force_mode:
+0306:         xbmc.executebuiltin('Container.SetViewMode({0})'.format(menu_mode))
+0307: 
+0308: 
+0309: def listLive(url):
+0310:     content = getUrl2(url)
+0311:     for item in content['list']:
+0312:         title = item['title'].encode('utf-8') if six.PY2 else item['title']
+0313:         vid = item['id']
+0314:         thumb = item['thumbnail_large_url']
+0315:         views = item['views_last_hour']
+0316:         addLiveLink(title, vid, 'playLiveVideo', thumb.replace("\\", ""), 'Views: {}'.format(views))
+0317:     if content['has_more']:
+0318:         currentPage = content['page']
+0319:         nextPage = currentPage + 1
+0320:         addDir("{0} ({1})".format(translation(30001), nextPage), url.replace("page={0}".format(currentPage), "page={0}".format(nextPage)), 'listLive', "{0}next_page2.png".format(_ipath))
+0321:     xbmcplugin.endOfDirectory(pluginhandle)
+0322:     xbmcplugin.setContent(pluginhandle, "episodes")
+0323:     if force_mode:
+0324:         xbmc.executebuiltin('Container.SetViewMode({0})'.format(menu_mode))
+0325: 
+0326: 
+0327: def playVideo(vid, live=False):
+0328:     if live:
+0329:         url = getStreamUrl(vid, live=True)
+0330:     else:
+0331:         url = getStreamUrl(vid)
+0332:     xbmc.log("DAILYMOTION - FinalUrl = {0}".format(url), xbmc.LOGDEBUG)
+0333: 
+0334:     if url:
+0335:         subs = []
+0336:         if isinstance(url, tuple):
+0337:             url, subs = url
+0338:         listitem = xbmcgui.ListItem(path=url)
+0339:         if subs:
+0340:             listitem.setSubtitles(subs)
+0341:         if '.m3u8' in url:
+0342:             listitem.setMimeType("application/x-mpegURL")
+0343:         else:
+0344:             listitem.setMimeType("video/mp4")
+0345:         listitem.setContentLookup(False)
+0346:         xbmcplugin.setResolvedUrl(pluginhandle, True, listitem=listitem)
+0347:     else:
+0348:         xbmcgui.Dialog().notification('Info:', translation(30022), _icon, 5000, False)
+0349: 
+0350: 
+0351: def s(elem):
+0352:     if elem[0] == "auto":
+0353:         return 1
+0354:     else:
+0355:         return int(elem[0].split("@")[0])
+0356: 
+0357: 
+0358: def _dm_quality(value):
+0359:     try:
+0360:         return int(str(value).split('@')[0])
+0361:     except (TypeError, ValueError):
+0362:         return 0
+0363: 
+0364: 
+0365: def _dm_playlist(url, headers, ceiling):
+0366:     """Resolve HLS master playlists without assuming absolute URLs or NAME tags."""
+0367:     if not isinstance(url, str) or not url.startswith(('https://', 'http://')):
+0368:         return None
+0369:     try:
+0370:         manifest = client.request(url, headers=headers)
+0371:     except Exception as exc:
+0372:         xbmc.log('DAILYMOTION - HLS request failed: {0}'.format(exc), xbmc.LOGWARNING)
+0373:         return None
+0374:     if not isinstance(manifest, str) or not manifest.strip():
+0375:         return None
+0376:     # A media playlist is already playable. Don't fetch its segments.
+0377:     if '#EXT-X-STREAM-INF' not in manifest:
+0378:         return url if '#EXTM3U' in manifest else None
+0379:     variants = []
+0380:     pending = None
+0381:     for line in manifest.splitlines():
+0382:         line = line.strip()
+0383:         if line.startswith('#EXT-X-STREAM-INF:'):
+0384:             attrs = line.split(':', 1)[1]
+0385:             match = re.search(r'RESOLUTION=\d+x(\d+)', attrs)
+0386:             name = re.search(r'NAME="?(\d+)', attrs)
+0387:             bandwidth = re.search(r'BANDWIDTH=(\d+)', attrs)
+0388:             pending = int(match.group(1)) if match else (int(name.group(1)) if name else 0)
+0389:             if pending == 0 and bandwidth:
+0390:                 pending = min(2160, max(240, int(bandwidth.group(1)) // 1500))
+0391:         elif pending is not None and line and not line.startswith('#'):
+0392:             variants.append((pending, urllib_parse.urljoin(url, line.split('#cell')[0])))
+0393:             pending = None
+0394:     if not variants:
+0395:         return None
+0396:     allowed = [v for v in variants if v[0] <= ceiling]
+0397:     chosen = max(allowed or variants, key=lambda v: v[0])
+0398:     return chosen[1]
+0399: 
+0400: 
+0401: def getStreamUrl(vid, live=False):
+0402:     headers = {'User-Agent': _UA,
+0403:                'Origin': 'https://www.dailymotion.com',
+0404:                'Referer': 'https://www.dailymotion.com/'}
+0405:     cookie = {'lang': language, 'ff': 'on' if familyFilter == '1' else 'off'}
+0406:     metadata_url = 'https://www.dailymotion.com/player/metadata/video/{0}'.format(vid)
+0407:     try:
+0408:         content = client.request(metadata_url, headers=headers, cookie=cookie)
+0409:     except Exception as exc:
+0410:         xbmc.log('DAILYMOTION - metadata request failed: {0}'.format(exc), xbmc.LOGERROR)
+0411:         return None
+0412:     if isinstance(content, str):
+0413:         try:
+0414:             content = json.loads(content)
+0415:         except (ValueError, TypeError):
+0416:             xbmc.log('DAILYMOTION - metadata returned non-JSON text', xbmc.LOGERROR)
+0417:             return None
+0418:     if not isinstance(content, dict):
+0419:         xbmc.log('DAILYMOTION - invalid/empty metadata response for {0}'.format(vid), xbmc.LOGERROR)
+0420:         return None
+0421:     error = content.get('error')
+0422:     if error:
+0423:         message = error.get('message', str(error)) if isinstance(error, dict) else str(error)
+0424:         xbmc.log('DAILYMOTION - metadata error: {0}'.format(message), xbmc.LOGWARNING)
+0425:         xbmcgui.Dialog().notification('Dailymotion', message, _icon, 5000, False)
+0426:         return None
+0427:     qualities = content.get('qualities')
+0428:     if not isinstance(qualities, dict) or not qualities:
+0429:         xbmc.log('DAILYMOTION - metadata has no playable qualities', xbmc.LOGERROR)
+0430:         return None
+0431:     subs = []
+0432:     subtitle_data = content.get('subtitles', {})
+0433:     if isinstance(subtitle_data, dict):
+0434:         subtitle_data = subtitle_data.get('data', {})
+0435:         if isinstance(subtitle_data, dict):
+0436:             for track in subtitle_data.values():
+0437:                 if isinstance(track, dict) and track.get('urls'):
+0438:                     subs.append(track['urls'][0])
+0439:     ceiling = _dm_quality(maxVideoQuality) or 2160
+0440:     options = []
+0441:     for quality, entries in qualities.items():
+0442:         if not isinstance(entries, list):
+0443:             continue
+0444:         for entry in entries:
+0445:             if not isinstance(entry, dict):
+0446:                 continue
+0447:             media_url = entry.get('url')
+0448:             if isinstance(media_url, list):
+0449:                 media_url = '?sec='.join(str(part) for part in media_url)
+0450:             if not isinstance(media_url, str) or not media_url.startswith(('https://', 'http://')):
+0451:                 continue
+0452:             media_url = media_url.replace('dvr=true&', '') if live else media_url
+0453:             options.append((_dm_quality(quality), media_url, entry.get('type', '')))
+0454:     options.sort(key=lambda item: item[0], reverse=True)
+0455:     for quality, media_url, media_type in options:
+0456:         if quality and quality > ceiling:
+0457:             continue
+0458:         is_hls = '.m3u8' in media_url.lower() or 'mpegurl' in str(media_type).lower()
+0459:         if is_hls:
+0460:             playable = _dm_playlist(media_url, headers, ceiling)
+0461:             if not playable:
+0462:                 xbmc.log('DAILYMOTION - skipping unplayable HLS manifest', xbmc.LOGWARNING)
+0463:                 continue
+0464:         elif 'video' in str(media_type).lower() or media_url.lower().split('?')[0].endswith('.mp4'):
+0465:             playable = media_url
+0466:         else:
+0467:             continue
+0468:         playable = '{0}|{1}'.format(playable.split('#cell')[0], urllib_parse.urlencode(headers))
+0469:         xbmc.log('DAILYMOTION - selected stream quality {0}'.format(quality), xbmc.LOGDEBUG)
+0470:         return (playable, subs) if subs and not live else playable
+0471:     xbmc.log('DAILYMOTION - no playable stream from metadata', xbmc.LOGERROR)
+0472:     return None
+0473: 
+0474: 
+0475: def queueVideo(url, name):
+0476:     playlist = xbmc.PlayList(xbmc.PLAYLIST_VIDEO)
+0477:     listitem = xbmcgui.ListItem(name)
+0478:     playlist.add(url, listitem)
+0479: 
+0480: 
+0481: def playArte(aid):
+0482:     try:
+0483:         content = getUrl2("http://www.dailymotion.com/video/{0}".format(aid))
+0484:         match = re.compile(r'<a\s*class="link"\s*href="http://videos.arte.tv/(.+?)/videos/(.+?).html">', re.DOTALL).findall(content)
+0485:         lang = match[0][0]
+0486:         vid = match[0][1]
+0487:         url = "http://videos.arte.tv/{0}/do_delegate/videos/{1},view,asPlayerXml.xml".format(lang, vid)
+0488:         content = getUrl2(url)
+0489:         match = re.compile(r'<video\s*lang="{0}"\s*ref="(.+?)"'.format(lang), re.DOTALL).findall(content)
+0490:         url = match[0]
+0491:         content = getUrl2(url)
+0492:         match1 = re.compile(r'<url\s*quality="hd">(.+?)</url>', re.DOTALL).findall(content)
+0493:         match2 = re.compile(r'<url\s*quality="sd">(.+?)</url>', re.DOTALL).findall(content)
+0494:         urlNew = ""
+0495:         if match1:
+0496:             urlNew = match1[0]
+0497:         elif match2:
+0498:             urlNew = match2[0]
+0499:         urlNew = urlNew.replace("MP4:", "mp4:")
+0500:         base = urlNew[:urlNew.find("mp4:")]
+0501:         playpath = urlNew[urlNew.find("mp4:"):]
+0502:         listitem = xbmcgui.ListItem(path="{0} playpath={1} swfVfy=1 swfUrl=http://videos.arte.tv/blob/web/i18n/view/player_24-3188338-data-5168030.swf".format(base, playpath))
+0503:         xbmcplugin.setResolvedUrl(pluginhandle, True, listitem)
+0504:     except:
+0505:         xbmcgui.Dialog().notification('Info:', translation(30110) + ' (Arte)!', _icon, 5000, False)
+0506: 
+0507: 
+0508: def addFav():
+0509:     keyboard = xbmc.Keyboard('', translation(30033))
+0510:     keyboard.doModal()
+0511:     if keyboard.isConfirmed() and keyboard.getText():
+0512:         user = keyboard.getText()
+0513:         channelEntry = "###USER###={0}###THUMB###=###END###".format(user)
+0514:         if xbmcvfs.exists(channelFavsFile):
+0515:             with open(channelFavsFile, 'r') as fh:
+0516:                 content = fh.read()
+0517:             if content.find(channelEntry) == -1:
+0518:                 with open(channelFavsFile, 'a') as fh:
+0519:                     fh.write(channelEntry + "\n")
+0520:         else:
+0521:             with open(channelFavsFile, 'a') as fh:
+0522:                 fh.write(channelEntry + "\n")
+0523:         xbmcgui.Dialog().notification('Info:', translation(30030), _icon, 5000, False)
+0524: 
+0525: 
+0526: def favourites(param):
+0527:     mode = param[param.find("###MODE###=") + 11:]
+0528:     mode = mode[:mode.find("###")]
+0529:     channelEntry = param[param.find("###USER###="):]
+0530:     user = param[11 + param.find("###USER###="):param.find("###THUMB###")]
