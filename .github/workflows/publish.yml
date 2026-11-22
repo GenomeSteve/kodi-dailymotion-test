@@ -27,7 +27,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add addons.xml addons.xml.md5 index.html repository.genomesteve.dailymotion.test-1.0.0.zip plugin.video.dailymotion_com/ repository.genomesteve.dailymotion.test/
+          git add playback_audit.txt addons.xml addons.xml.md5 index.html repository.genomesteve.dailymotion.test-1.0.0.zip plugin.video.dailymotion_com/ repository.genomesteve.dailymotion.test/
           if ! git diff --cached --quiet; then
             git commit -m "Publish Dailymotion 2.4.5.1 isolated test feed"
             git pull --rebase origin main
