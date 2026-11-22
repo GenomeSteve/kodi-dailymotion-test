@@ -25,7 +25,7 @@ jobs:
                   s=z.read(name).decode()
                   lines=s.splitlines()
                   for i,line in enumerate(lines):
-                      if re.search(r'def (getStreamUrl|playVideo|queueVideo|_UA)|getStreamUrl\\(|_icon|metadata|subtitles',line):
+                      if any(token in line for token in ('def getStreamUrl','def playVideo','def queueVideo','getStreamUrl(', '_UA', 'metadata', 'subtitles')):
                           lo=max(0,i-5); hi=min(len(lines),i+26)
                           print("\\nSOURCE",name,"LINES",lo+1,hi)
                           for n in range(lo,hi):print(f"{n+1:04}: {lines[n]}")
