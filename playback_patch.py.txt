@@ -106,10 +106,11 @@ def getStreamUrl(vid, live=False):
             continue
         is_hls = '.m3u8' in media_url.lower() or 'mpegurl' in str(media_type).lower()
         if is_hls:
-            playable = _dm_playlist(media_url, headers, ceiling)
-            if not playable:
-                xbmc.log('DAILYMOTION - skipping unplayable HLS manifest', xbmc.LOGWARNING)
-                continue
+            # Let Kodi/FFmpeg resolve the master playlist and its signed variants.
+            # Selecting a nested variant here can break token/cookie propagation.
+            playable = media_url.split('#cell')[0]
+            xbmc.log('DAILYMOTION - handing master HLS playlist to Kodi', xbmc.LOGINFO)
+            return (playable, subs) if subs and not live else playable
         elif 'video' in str(media_type).lower() or media_url.lower().split('?')[0].endswith('.mp4'):
             playable = media_url
         else:
