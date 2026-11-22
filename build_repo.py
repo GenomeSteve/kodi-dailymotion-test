@@ -72,4 +72,15 @@ catalog='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<addons>\n'+re
 ET.fromstring(catalog)
 (root/"addons.xml").write_text(catalog)
 (root/"addons.xml.md5").write_text(hashlib.md5(catalog.encode()).hexdigest())
+# Put the installer at the website root so Kodi sees a direct ZIP link.
+import shutil
+installer_name=repoid+"-1.0.0.zip"
+shutil.copyfile(repo_dir/installer_name, root/installer_name)
+(root/"index.html").write_text('''<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<html><head><title>Index of /kodi-dailymotion-test/</title></head><body>
+<h1>Index of /kodi-dailymotion-test/</h1><hr><pre>
+<a href="../">../</a>
+<a href="repository.genomesteve.dailymotion.test-1.0.0.zip">repository.genomesteve.dailymotion.test-1.0.0.zip</a>
+</pre><hr></body></html>
+''')
 print("Built isolated Kodi repository successfully")
