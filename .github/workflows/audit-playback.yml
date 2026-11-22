@@ -29,4 +29,13 @@ jobs:
                           lo=max(0,i-5); hi=min(len(lines),i+26)
                           print("\\nSOURCE",name,"LINES",lo+1,hi)
                           for n in range(lo,hi):print(f"{n+1:04}: {lines[n]}")
+          print("UPSTREAM PYTHON FILES:", [n for n in z.namelist() if n.endswith("client.py") or n.endswith("dailymotion.py")])
+          for name in z.namelist():
+              if name.endswith("client.py"):
+                  lines=z.read(name).decode("utf-8").splitlines()
+                  for i,line in enumerate(lines):
+                      if line.startswith("def request("):
+                          print("CLIENT REQUEST:",name)
+                          for j in range(i,min(len(lines),i+145)):print(f"{j+1:04}: {lines[j]}")
+          print("DM IMPORTS:", "\\n".join(z.read(next(n for n in z.namelist() if n.endswith("resources/lib/dailymotion.py"))).decode().splitlines()[:70]))
           PY
