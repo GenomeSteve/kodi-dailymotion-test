@@ -13,9 +13,10 @@ def _dm_playlist(url, headers, ceiling):
         manifest = client.request(url, headers=headers)
     except Exception as exc:
         xbmc.log('DAILYMOTION - HLS request failed: {0}'.format(exc), xbmc.LOGWARNING)
-        return None
+        return url
     if not isinstance(manifest, str) or not manifest.strip():
-        return None
+        xbmc.log('DAILYMOTION - passing master HLS URL directly to Kodi', xbmc.LOGWARNING)
+        return url
     # A media playlist is already playable. Don't fetch its segments.
     if '#EXT-X-STREAM-INF' not in manifest:
         return url if '#EXTM3U' in manifest else None
@@ -35,7 +36,8 @@ def _dm_playlist(url, headers, ceiling):
             variants.append((pending, urllib_parse.urljoin(url, line.split('#cell')[0])))
             pending = None
     if not variants:
-        return None
+        xbmc.log('DAILYMOTION - master manifest lacks parsed variants; passing to Kodi', xbmc.LOGWARNING)
+        return url
     allowed = [v for v in variants if v[0] <= ceiling]
     chosen = max(allowed or variants, key=lambda v: v[0])
     return chosen[1]
@@ -51,6 +53,7 @@ def getStreamUrl(vid, live=False):
         content = client.request(metadata_url, headers=headers, cookie=cookie)
     except Exception as exc:
         xbmc.log('DAILYMOTION - metadata request failed: {0}'.format(exc), xbmc.LOGERROR)
+        xbmcgui.Dialog().notification('Dailymotion test', 'Metadata request failed', _icon, 6000, False)
         return None
     if isinstance(content, str):
         import json
@@ -61,6 +64,7 @@ def getStreamUrl(vid, live=False):
             return None
     if not isinstance(content, dict):
         xbmc.log('DAILYMOTION - invalid/empty metadata response for {0}'.format(vid), xbmc.LOGERROR)
+        xbmcgui.Dialog().notification('Dailymotion test', 'Metadata unavailable on this device', _icon, 6000, False)
         return None
     error = content.get('error')
     if error:
@@ -71,6 +75,7 @@ def getStreamUrl(vid, live=False):
     qualities = content.get('qualities')
     if not isinstance(qualities, dict) or not qualities:
         xbmc.log('DAILYMOTION - metadata has no playable qualities', xbmc.LOGERROR)
+        xbmcgui.Dialog().notification('Dailymotion test', 'No qualities in metadata', _icon, 6000, False)
         return None
     subs = []
     subtitle_data = content.get('subtitles', {})
@@ -113,6 +118,7 @@ def getStreamUrl(vid, live=False):
         xbmc.log('DAILYMOTION - selected stream quality {0}'.format(quality), xbmc.LOGDEBUG)
         return (playable, subs) if subs and not live else playable
     xbmc.log('DAILYMOTION - no playable stream from metadata', xbmc.LOGERROR)
+    xbmcgui.Dialog().notification('Dailymotion test', 'No supported stream in metadata', _icon, 6000, False)
     return None
 
 
