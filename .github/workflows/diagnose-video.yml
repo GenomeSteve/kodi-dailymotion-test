@@ -44,4 +44,24 @@ jobs:
               except urllib.error.HTTPError as e:
                 print('PATH',url.split('?')[0],'UA','old' if ua==uas[0] else 'new','HTTP',e.code,'TYPE',e.headers.get('content-type'))
               except Exception as e:print('PATH',url.split('?')[0],'ERROR',type(e).__name__,str(e)[:180])
+          for ua in uas:
+            req=urllib.request.Request('https://www.dailymotion.com/player/metadata/video/'+vid,headers={'User-Agent':ua,'Referer':'https://www.dailymotion.com/'})
+            try:
+              metadata=json.load(urllib.request.urlopen(req,timeout=15))
+              for quality,items in metadata.get('qualities',{}).items():
+                for item in items:
+                  manifest_url=item.get('url')
+                  if not isinstance(manifest_url,str):continue
+                  try:
+                    mreq=urllib.request.Request(manifest_url,headers={'User-Agent':ua,'Referer':'https://www.dailymotion.com/'})
+                    with urllib.request.urlopen(mreq,timeout=15) as response:
+                      manifest=response.read(100000).decode('utf-8','replace')
+                      lines=manifest.splitlines()
+                      print('MANIFEST',quality,'UA','old' if ua==uas[0] else 'new','STATUS',response.status,'TYPE',response.headers.get('content-type'),'LINES',len(lines),'STREAM-INF',sum('#EXT-X-STREAM-INF' in line for line in lines),'MEDIA',sum('#EXT-X-MEDIA' in line for line in lines))
+                      for line in lines[:15]:
+                        if line.startswith('#'):print('MANIFEST TAG',line[:200])
+                        else:print('MANIFEST URL RELATIVE',not line.startswith('http'))
+                  except urllib.error.HTTPError as e:print('MANIFEST HTTP',e.code,'UA','old' if ua==uas[0] else 'new')
+                  except Exception as e:print('MANIFEST ERROR',type(e).__name__,str(e)[:150])
+            except Exception as e:print('METADATA ERROR',str(e)[:150])
           PY
