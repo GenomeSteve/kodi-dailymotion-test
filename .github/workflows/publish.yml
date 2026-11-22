@@ -3,6 +3,7 @@ on:
   push:
     paths:
       - build_repo.py
+      - playback_patch.py.txt
       - .github/workflows/publish.yml
   workflow_dispatch:
 permissions:
