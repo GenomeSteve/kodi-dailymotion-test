@@ -47,7 +47,7 @@ shutil.copyfile(repo_dir/installer_name, root/installer_name)
 ''')
 # Temporary source audit: retain only code structure, no credentials.
 audit = files[key].decode("utf-8")
-(root/"playback_audit.txt").write_text("\\n".join(
+(root/"playback_audit.txt").write_text("\n".join(
     "{:04d}: {}".format(i, line) for i, line in enumerate(audit.splitlines(), 1)
     if i >= 270 and i <= 530
 ))
