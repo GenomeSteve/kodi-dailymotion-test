@@ -1,0 +1,110 @@
+def _dm_quality(value):
+    try:
+        return int(str(value).split('@')[0])
+    except (TypeError, ValueError):
+        return 0
+
+
+def _dm_playlist(url, headers, ceiling):
+    """Resolve HLS master playlists without assuming absolute URLs or NAME tags."""
+    if not isinstance(url, str) or not url.startswith(('https://', 'http://')):
+        return None
+    try:
+        manifest = client.request(url, headers=headers)
+    except Exception as exc:
+        xbmc.log('DAILYMOTION - HLS request failed: {0}'.format(exc), xbmc.LOGWARNING)
+        return None
+    if not isinstance(manifest, str) or not manifest.strip():
+        return None
+    # A media playlist is already playable. Don't fetch its segments.
+    if '#EXT-X-STREAM-INF' not in manifest:
+        return url if '#EXTM3U' in manifest else None
+    variants = []
+    pending = None
+    for line in manifest.splitlines():
+        line = line.strip()
+        if line.startswith('#EXT-X-STREAM-INF:'):
+            attrs = line.split(':', 1)[1]
+            match = re.search(r'RESOLUTION=\\d+x(\\d+)', attrs)
+            name = re.search(r'NAME="?(\\d+)', attrs)
+            bandwidth = re.search(r'BANDWIDTH=(\\d+)', attrs)
+            pending = int(match.group(1)) if match else (int(name.group(1)) if name else 0)
+            if pending == 0 and bandwidth:
+                pending = min(2160, max(240, int(bandwidth.group(1)) // 1500))
+        elif pending is not None and line and not line.startswith('#'):
+            variants.append((pending, urllib_parse.urljoin(url, line.split('#cell')[0])))
+            pending = None
+    if not variants:
+        return None
+    allowed = [v for v in variants if v[0] <= ceiling]
+    chosen = max(allowed or variants, key=lambda v: v[0])
+    return chosen[1]
+
+
+def getStreamUrl(vid, live=False):
+    headers = {'User-Agent': _UA,
+               'Origin': 'https://www.dailymotion.com',
+               'Referer': 'https://www.dailymotion.com/'}
+    cookie = {'lang': language, 'ff': 'on' if familyFilter == '1' else 'off'}
+    metadata_url = 'https://www.dailymotion.com/player/metadata/video/{0}'.format(vid)
+    try:
+        content = client.request(metadata_url, headers=headers, cookie=cookie)
+    except Exception as exc:
+        xbmc.log('DAILYMOTION - metadata request failed: {0}'.format(exc), xbmc.LOGERROR)
+        return None
+    if not isinstance(content, dict):
+        xbmc.log('DAILYMOTION - invalid/empty metadata response for {0}'.format(vid), xbmc.LOGERROR)
+        return None
+    error = content.get('error')
+    if error:
+        message = error.get('message', str(error)) if isinstance(error, dict) else str(error)
+        xbmc.log('DAILYMOTION - metadata error: {0}'.format(message), xbmc.LOGWARNING)
+        xbmcgui.Dialog().notification('Dailymotion', message, _icon, 5000, False)
+        return None
+    qualities = content.get('qualities')
+    if not isinstance(qualities, dict) or not qualities:
+        xbmc.log('DAILYMOTION - metadata has no playable qualities', xbmc.LOGERROR)
+        return None
+    subs = []
+    subtitle_data = content.get('subtitles', {})
+    if isinstance(subtitle_data, dict):
+        subtitle_data = subtitle_data.get('data', {})
+        if isinstance(subtitle_data, dict):
+            for track in subtitle_data.values():
+                if isinstance(track, dict) and track.get('urls'):
+                    subs.append(track['urls'][0])
+    ceiling = _dm_quality(maxVideoQuality)
+    options = []
+    for quality, entries in qualities.items():
+        if not isinstance(entries, list):
+            continue
+        for entry in entries:
+            if not isinstance(entry, dict):
+                continue
+            media_url = entry.get('url')
+            if isinstance(media_url, list):
+                media_url = '?sec='.join(str(part) for part in media_url)
+            if not isinstance(media_url, str) or not media_url.startswith(('https://', 'http://')):
+                continue
+            media_url = media_url.replace('dvr=true&', '') if live else media_url
+            options.append((_dm_quality(quality), media_url, entry.get('type', '')))
+    options.sort(key=lambda item: item[0], reverse=True)
+    for quality, media_url, media_type in options:
+        if quality and quality > ceiling:
+            continue
+        is_hls = '.m3u8' in media_url or 'mpegurl' in str(media_type).lower()
+        if is_hls:
+            playable = _dm_playlist(media_url, headers, ceiling)
+            if not playable:
+                continue
+        elif 'video' in str(media_type).lower() or media_url.lower().split('?')[0].endswith('.mp4'):
+            playable = media_url
+        else:
+            continue
+        playable = '{0}|{1}'.format(playable.split('#cell')[0], urllib_parse.urlencode(headers))
+        xbmc.log('DAILYMOTION - selected stream quality {0}'.format(quality), xbmc.LOGDEBUG)
+        return (playable, subs) if subs and not live else playable
+    xbmc.log('DAILYMOTION - no playable stream from metadata', xbmc.LOGERROR)
+    return None
+
+
