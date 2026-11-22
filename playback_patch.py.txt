@@ -53,6 +53,7 @@ def getStreamUrl(vid, live=False):
         xbmc.log('DAILYMOTION - metadata request failed: {0}'.format(exc), xbmc.LOGERROR)
         return None
     if isinstance(content, str):
+        import json
         try:
             content = json.loads(content)
         except (ValueError, TypeError):
