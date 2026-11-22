@@ -11,57 +11,19 @@ source=zipfile.ZipFile(io.BytesIO(data))
 files={i.filename:source.read(i) for i in source.infolist() if not i.is_dir()}
 prefix="plugin.video.dailymotion_com/"
 addon=prefix+"addon.xml"
-files[addon]=files[addon].replace(b'version="2.4.5"',b'version="2.4.5.1"',1)
+files[addon]=files[addon].replace(b'version="2.4.5"',b'version="2.4.5.2"',1)
 key=prefix+"resources/lib/dailymotion.py"
 s=files[key].decode("utf-8")
-old='''                    mburl = re.findall('(http.+)', rr)[0].split('#cell')[0]
-                    xbmc.log("DAILYMOTION - other mburl = {0}".format(mburl), xbmc.LOGDEBUG)
-                    mb = client.request(mburl, headers=headers)
-                    mb = re.findall('NAME="([^"]+)"\\n(.+)', mb)
-                    if mb:
-                        mb = sorted(mb, key=s, reverse=True)
-                        for quality, strurl in mb:
-                            quality = quality.split("@")[0]
-                            if int(quality) <= int(maxVideoQuality):
-                                if not strurl.startswith('http'):
-                                    strurl1 = re.findall('(.+/)', mburl)[0]
-                                    strurl = strurl1 + strurl
-                                break
-                    else:
-                        strurl = mburl
-
-                    xbmc.log("DAILYMOTION - Calculated url = {0}".format(strurl), xbmc.LOGDEBUG)
-                    return strurl'''
-new='''                    # Handle missing absolute URL in Dailymotion playlist response.
-                    playlist_urls = re.findall(r'https?://[^\\s"\\\']+', rr or '')
-                    mburl = playlist_urls[0].split('#cell')[0] if playlist_urls else m_url
-                    xbmc.log("DAILYMOTION - fallback playlist = {0}".format(mburl), xbmc.LOGDEBUG)
-                    try:
-                        mbtext = client.request(mburl, headers=headers)
-                    except Exception as exc:
-                        xbmc.log("DAILYMOTION - fallback fetch failed: {0}".format(exc), xbmc.LOGWARNING)
-                        mbtext = ''
-                    variants = re.findall(r'NAME="([^"]+)"[^\\n]*\\n([^\\n]+)', mbtext or '')
-                    strurl = mburl
-                    if variants:
-                        variants = sorted(variants, key=s, reverse=True)
-                        for quality, candidate in variants:
-                            try:
-                                allowed = int(quality.split('@')[0]) <= int(maxVideoQuality)
-                            except (ValueError, TypeError):
-                                allowed = False
-                            if allowed:
-                                strurl = urllib_parse.urljoin(mburl, candidate.strip().split('#cell')[0])
-                                break
-                    xbmc.log("DAILYMOTION - fallback URL selected = {0}".format(strurl), xbmc.LOGDEBUG)
-                    return '{0}|{1}'.format(strurl, urllib_parse.urlencode(headers))'''
-assert s.count(old)==1, "Expected playback code not found exactly; refusing to publish"
-s=s.replace(old,new)
+# Replace the full legacy resolver; the old patch only masked IndexError.
+start=s.index('def getStreamUrl(')
+end=s.index('def queueVideo(', start)
+replacement=(root/"playback_patch.py.txt").read_text()
+s=s[:start]+replacement+s[end:]
 compile(s,key,"exec")
 files[key]=s.encode("utf-8")
 out=root/"plugin.video.dailymotion_com"
 out.mkdir(exist_ok=True)
-with zipfile.ZipFile(out/"plugin.video.dailymotion_com-2.4.5.1.zip","w",zipfile.ZIP_DEFLATED) as z:
+with zipfile.ZipFile(out/"plugin.video.dailymotion_com-2.4.5.2.zip","w",zipfile.ZIP_DEFLATED) as z:
     for name,body in files.items(): z.writestr(name,body)
 repoid="repository.genomesteve.dailymotion.test"
 repo_xml='''<addon id="repository.genomesteve.dailymotion.test" name="GenomeSteve Dailymotion Test Repository" version="1.0.0" provider-name="GenomeSteve"><extension point="xbmc.addon.repository" name="GenomeSteve Dailymotion Test Repository"><dir><info compressed="false">https://raw.githubusercontent.com/GenomeSteve/kodi-dailymotion-test/main/addons.xml</info><checksum>https://raw.githubusercontent.com/GenomeSteve/kodi-dailymotion-test/main/addons.xml.md5</checksum><datadir zip="true">https://raw.githubusercontent.com/GenomeSteve/kodi-dailymotion-test/main/</datadir></dir></extension><extension point="xbmc.addon.metadata"><summary lang="en_GB">Isolated Dailymotion test feed</summary><description lang="en_GB">Experimental Kodi Omega Dailymotion playback patch.</description><platform>all</platform></extension></addon>'''
