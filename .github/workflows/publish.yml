@@ -1,0 +1,30 @@
+name: Publish isolated Dailymotion test feed
+on:
+  push:
+    paths:
+      - build_repo.py
+      - .github/workflows/publish.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Build Kodi repository from pinned upstream ZIP
+        run: python build_repo.py
+      - name: Commit only Dailymotion repository artefacts
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add addons.xml addons.xml.md5 plugin.video.dailymotion_com/ repository.genomesteve.dailymotion.test/
+          if ! git diff --cached --quiet; then
+            git commit -m "Publish Dailymotion 2.4.5.1 isolated test feed"
+            git push
+          fi
