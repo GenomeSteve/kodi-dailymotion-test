@@ -11,7 +11,7 @@ source=zipfile.ZipFile(io.BytesIO(data))
 files={i.filename:source.read(i) for i in source.infolist() if not i.is_dir()}
 prefix="plugin.video.dailymotion_com/"
 addon=prefix+"addon.xml"
-files[addon]=files[addon].replace(b'version="2.4.5"',b'version="2.4.5.3"',1)
+files[addon]=files[addon].replace(b'version="2.4.5"',b'version="2.4.5.4"',1)
 key=prefix+"resources/lib/dailymotion.py"
 s=files[key].decode("utf-8")
 # Replace the full legacy resolver; the old patch only masked IndexError.
@@ -23,7 +23,7 @@ compile(s,key,"exec")
 files[key]=s.encode("utf-8")
 out=root/"plugin.video.dailymotion_com"
 out.mkdir(exist_ok=True)
-with zipfile.ZipFile(out/"plugin.video.dailymotion_com-2.4.5.3.zip","w",zipfile.ZIP_DEFLATED) as z:
+with zipfile.ZipFile(out/"plugin.video.dailymotion_com-2.4.5.4.zip","w",zipfile.ZIP_DEFLATED) as z:
     for name,body in files.items(): z.writestr(name,body)
 repoid="repository.genomesteve.dailymotion.test"
 repo_xml='''<addon id="repository.genomesteve.dailymotion.test" name="GenomeSteve Dailymotion Test Repository" version="1.0.0" provider-name="GenomeSteve"><extension point="xbmc.addon.repository" name="GenomeSteve Dailymotion Test Repository"><dir><info compressed="false">https://raw.githubusercontent.com/GenomeSteve/kodi-dailymotion-test/main/addons.xml</info><checksum>https://raw.githubusercontent.com/GenomeSteve/kodi-dailymotion-test/main/addons.xml.md5</checksum><datadir zip="true">https://raw.githubusercontent.com/GenomeSteve/kodi-dailymotion-test/main/</datadir></dir></extension><extension point="xbmc.addon.metadata"><summary lang="en_GB">Isolated Dailymotion test feed</summary><description lang="en_GB">Experimental Kodi Omega Dailymotion playback patch.</description><platform>all</platform></extension></addon>'''
