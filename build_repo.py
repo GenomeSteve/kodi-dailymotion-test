@@ -45,4 +45,10 @@ shutil.copyfile(repo_dir/installer_name, root/installer_name)
 <a href="repository.genomesteve.dailymotion.test-1.0.0.zip">repository.genomesteve.dailymotion.test-1.0.0.zip</a>
 </pre><hr></body></html>
 ''')
+# Temporary source audit: retain only code structure, no credentials.
+audit = files[key].decode("utf-8")
+(root/"playback_audit.txt").write_text("\\n".join(
+    "{:04d}: {}".format(i, line) for i, line in enumerate(audit.splitlines(), 1)
+    if i >= 270 and i <= 530
+))
 print("Built isolated Kodi repository successfully")
