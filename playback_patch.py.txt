@@ -25,9 +25,9 @@ def _dm_playlist(url, headers, ceiling):
         line = line.strip()
         if line.startswith('#EXT-X-STREAM-INF:'):
             attrs = line.split(':', 1)[1]
-            match = re.search(r'RESOLUTION=\\d+x(\\d+)', attrs)
-            name = re.search(r'NAME="?(\\d+)', attrs)
-            bandwidth = re.search(r'BANDWIDTH=(\\d+)', attrs)
+            match = re.search(r'RESOLUTION=\d+x(\d+)', attrs)
+            name = re.search(r'NAME="?(\d+)', attrs)
+            bandwidth = re.search(r'BANDWIDTH=(\d+)', attrs)
             pending = int(match.group(1)) if match else (int(name.group(1)) if name else 0)
             if pending == 0 and bandwidth:
                 pending = min(2160, max(240, int(bandwidth.group(1)) // 1500))
