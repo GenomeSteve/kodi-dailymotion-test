@@ -52,6 +52,12 @@ def getStreamUrl(vid, live=False):
     except Exception as exc:
         xbmc.log('DAILYMOTION - metadata request failed: {0}'.format(exc), xbmc.LOGERROR)
         return None
+    if isinstance(content, str):
+        try:
+            content = json.loads(content)
+        except (ValueError, TypeError):
+            xbmc.log('DAILYMOTION - metadata returned non-JSON text', xbmc.LOGERROR)
+            return None
     if not isinstance(content, dict):
         xbmc.log('DAILYMOTION - invalid/empty metadata response for {0}'.format(vid), xbmc.LOGERROR)
         return None
@@ -73,7 +79,7 @@ def getStreamUrl(vid, live=False):
             for track in subtitle_data.values():
                 if isinstance(track, dict) and track.get('urls'):
                     subs.append(track['urls'][0])
-    ceiling = _dm_quality(maxVideoQuality)
+    ceiling = _dm_quality(maxVideoQuality) or 2160
     options = []
     for quality, entries in qualities.items():
         if not isinstance(entries, list):
@@ -92,10 +98,11 @@ def getStreamUrl(vid, live=False):
     for quality, media_url, media_type in options:
         if quality and quality > ceiling:
             continue
-        is_hls = '.m3u8' in media_url or 'mpegurl' in str(media_type).lower()
+        is_hls = '.m3u8' in media_url.lower() or 'mpegurl' in str(media_type).lower()
         if is_hls:
             playable = _dm_playlist(media_url, headers, ceiling)
             if not playable:
+                xbmc.log('DAILYMOTION - skipping unplayable HLS manifest', xbmc.LOGWARNING)
                 continue
         elif 'video' in str(media_type).lower() or media_url.lower().split('?')[0].endswith('.mp4'):
             playable = media_url
