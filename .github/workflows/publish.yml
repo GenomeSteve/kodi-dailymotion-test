@@ -6,6 +6,9 @@ on:
       - playback_patch.py.txt
       - .github/workflows/publish.yml
   workflow_dispatch:
+concurrency:
+  group: dailymotion-build
+  cancel-in-progress: false
 permissions:
   contents: write
 jobs:
@@ -27,5 +30,6 @@ jobs:
           git add addons.xml addons.xml.md5 index.html repository.genomesteve.dailymotion.test-1.0.0.zip plugin.video.dailymotion_com/ repository.genomesteve.dailymotion.test/
           if ! git diff --cached --quiet; then
             git commit -m "Publish Dailymotion 2.4.5.1 isolated test feed"
+            git pull --rebase origin main
             git push
           fi
