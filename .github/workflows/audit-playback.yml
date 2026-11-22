@@ -1,0 +1,32 @@
+name: Audit Dailymotion playback integration
+on:
+  push:
+    paths:
+      - .github/workflows/audit-playback.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Inspect upstream source and patched playback contract
+        run: |
+          python - <<'PY'
+          import io, urllib.request, zipfile, re
+          u="https://softlibre.unizar.es/kodi/addons/omega/plugin.video.dailymotion_com/plugin.video.dailymotion_com-2.4.5.zip"
+          z=zipfile.ZipFile(io.BytesIO(urllib.request.urlopen(u,timeout=40).read()))
+          for name in z.namelist():
+              if name.endswith("resources/lib/dailymotion.py"):
+                  s=z.read(name).decode()
+                  lines=s.splitlines()
+                  for i,line in enumerate(lines):
+                      if re.search(r'def (getStreamUrl|playVideo|queueVideo|_UA)|getStreamUrl\\(|_icon|metadata|subtitles',line):
+                          lo=max(0,i-5); hi=min(len(lines),i+26)
+                          print("\\nSOURCE",name,"LINES",lo+1,hi)
+                          for n in range(lo,hi):print(f"{n+1:04}: {lines[n]}")
+          PY
